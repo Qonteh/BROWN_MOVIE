@@ -42,11 +42,16 @@ export async function GET() {
     )
 
     const slides = result.rows
-      .map((row: { image_url?: unknown; movie_image?: unknown } & Record<string, unknown>) => ({
-        ...row,
-        image_url: sanitizeImageUrl(row.image_url),
-        movie_image: sanitizeImageUrl(row.movie_image),
-      }))
+      .map((row: { id?: unknown; image_url?: unknown; movie_image?: unknown } & Record<string, unknown>) => {
+        const rawImage = typeof row.image_url === 'string' ? row.image_url.trim() : ''
+        const safeImage = sanitizeImageUrl(rawImage)
+
+        return {
+          ...row,
+          image_url: safeImage || (rawImage ? `/api/hero-slides/${String(row.id || '')}/image` : null),
+          movie_image: sanitizeImageUrl(row.movie_image),
+        }
+      })
       .filter((row: { image_url: string | null }) => row.image_url)
 
     return NextResponse.json({ success: true, slides })
