@@ -248,25 +248,19 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Background Images with Parallax */}
-      {activeSlides.map((slide, index) => (
-        <div
-          key={slide.id}
-          className={`absolute inset-0 pointer-events-none transition-all duration-700 ${
-            index === currentIndex 
-              ? "opacity-100 scale-100" 
-              : "opacity-0 scale-105"
-          }`}
-        >
-          <Image
-            src={slide.image}
-            alt={slide.title}
-            fill
-            className="object-cover"
-            priority={index === 0}
-          />
-        </div>
-      ))}
+      {/* Active background image only to avoid loading all hero images at once */}
+      <div
+        key={currentSlide.id}
+        className="absolute inset-0 pointer-events-none transition-all duration-700 opacity-100 scale-100"
+      >
+        <Image
+          src={currentSlide.image}
+          alt={currentSlide.title}
+          fill
+          className="object-cover"
+          priority
+        />
+      </div>
       
       {/* Gradient Overlays */}
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-background via-background/60 to-transparent" />
