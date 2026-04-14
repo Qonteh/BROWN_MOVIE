@@ -54,16 +54,20 @@ export async function POST(request: NextRequest) {
     const token = generateToken(user.id, user.email);
 
     // Log signup to auth_audit_logs
-    await query(
-      `INSERT INTO auth_audit_logs (user_id, action, ip_address, user_agent, created_at)
-       VALUES ($1, $2, $3, $4, NOW())`,
-      [
-        user.id,
-        'signup',
-        request.headers.get('x-forwarded-for') || 'unknown',
-        request.headers.get('user-agent') || 'unknown',
-      ]
-    );
+    try {
+      await query(
+        `INSERT INTO auth_audit_logs (user_id, action, ip_address, user_agent, created_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [
+          user.id,
+          'signup',
+          request.headers.get('x-forwarded-for') || 'unknown',
+          request.headers.get('user-agent') || 'unknown',
+        ]
+      );
+    } catch (auditError) {
+      console.error('Signup audit log error:', auditError)
+    }
 
     return NextResponse.json(
       {
