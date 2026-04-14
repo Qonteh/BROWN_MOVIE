@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     // Find user by email
     const result = await query(
-      `SELECT id, email, password_hash, full_name, role, locked_until, COALESCE(failed_login_attempts, 0) AS failed_login_attempts
+      `SELECT id, email, password_hash, full_name, role
        FROM users
        WHERE email = $1`,
       [normalizedEmail]
@@ -50,8 +50,22 @@ export async function POST(request: NextRequest) {
 
     const user = result.rows[0];
 
+    // Best effort: lockout fields may be missing if auth migration was not applied.
+    let lockedUntil: string | null = null
+    try {
+      const lockoutResult = await query(
+        `SELECT locked_until, COALESCE(failed_login_attempts, 0) AS failed_login_attempts
+         FROM users
+         WHERE id = $1`,
+        [user.id]
+      )
+      lockedUntil = lockoutResult.rows[0]?.locked_until ?? null
+    } catch (lockoutError) {
+      console.error('Lockout fields read error:', lockoutError)
+    }
+
     // Check if user is locked
-    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+    if (lockedUntil && new Date(lockedUntil) > new Date()) {
       return NextResponse.json(
         { error: 'Account temporarily locked due to too many failed login attempts. Try again later.' },
         { status: 429 }
