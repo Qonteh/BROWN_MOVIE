@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getTokenFromHeaders, verifyToken } from '@/lib/auth-helpers'
 import { getClient } from '@/lib/db'
 import { ensureMovieMediaSchema } from '@/lib/movie-media'
+import { sanitizeImageUrl } from '@/lib/image-url'
 
 export async function GET(request: NextRequest) {
   const token = getTokenFromHeaders(Object.fromEntries(request.headers))
@@ -86,7 +87,10 @@ export async function GET(request: NextRequest) {
       [decoded.userId],
     )
 
-    const movies = result.rows
+    const movies = result.rows.map((row) => ({
+      ...row,
+      poster_url: sanitizeImageUrl(row.poster_url),
+    }))
     const totalMovies = movies.length
     const totalAmount = movies.reduce((sum, row) => sum + Number(row.amount || 0), 0)
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getClient } from '@/lib/db'
 import { ensureMovieMediaSchema } from '@/lib/movie-media'
+import { sanitizeImageUrl } from '@/lib/image-url'
 
 export async function GET() {
   const client = await getClient()
@@ -74,7 +75,12 @@ export async function GET() {
       ORDER BY m.is_featured DESC, m.is_new DESC, m.created_at DESC`,
     )
 
-    return NextResponse.json({ success: true, movies: result.rows })
+    const movies = result.rows.map((row) => ({
+      ...row,
+      poster_url: sanitizeImageUrl(row.poster_url),
+    }))
+
+    return NextResponse.json({ success: true, movies })
   } catch (error) {
     console.error('Public movies error:', error)
     return NextResponse.json({ success: false, error: 'Failed to fetch movies' }, { status: 500 })

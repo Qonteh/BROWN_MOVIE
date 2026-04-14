@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getClient } from '@/lib/db'
+import { sanitizeImageUrl } from '@/lib/image-url'
 
 export async function GET() {
   const client = await getClient()
@@ -40,7 +41,15 @@ export async function GET() {
       ORDER BY hs.sort_order ASC, hs.created_at DESC`,
     )
 
-    return NextResponse.json({ success: true, slides: result.rows })
+    const slides = result.rows
+      .map((row: { image_url?: unknown; movie_image?: unknown } & Record<string, unknown>) => ({
+        ...row,
+        image_url: sanitizeImageUrl(row.image_url),
+        movie_image: sanitizeImageUrl(row.movie_image),
+      }))
+      .filter((row: { image_url: string | null }) => row.image_url)
+
+    return NextResponse.json({ success: true, slides })
   } catch (error) {
     console.error('Public hero slides error:', error)
     return NextResponse.json({ error: 'Failed to fetch hero slides' }, { status: 500 })
