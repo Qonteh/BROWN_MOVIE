@@ -2,12 +2,17 @@ import { Pool, QueryResult } from 'pg';
 
 let pool: Pool | null = null
 
+function normalizeDatabaseUrl(raw: string) {
+  // Guard against common typo: channel_binding=requvire
+  return raw.replace(/channel_binding=requvire/gi, 'channel_binding=require')
+}
+
 function getPool() {
   if (pool) {
     return pool
   }
 
-  const connectionString = process.env.DATABASE_URL
+  const connectionString = normalizeDatabaseUrl(process.env.DATABASE_URL)
   if (!connectionString) {
     throw new Error('DATABASE_URL is not set')
   }
