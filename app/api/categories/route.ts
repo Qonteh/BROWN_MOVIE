@@ -6,9 +6,10 @@ async function ensureCategoryImageColumn(client: Awaited<ReturnType<typeof getCl
 }
 
 export async function GET() {
-  const client = await getClient()
+  let client: Awaited<ReturnType<typeof getClient>> | null = null
 
   try {
+    client = await getClient()
     await ensureCategoryImageColumn(client)
 
     const result = await client.query(
@@ -34,8 +35,8 @@ export async function GET() {
     return NextResponse.json({ success: true, categories: result.rows })
   } catch (error) {
     console.error('Public categories error:', error)
-    return NextResponse.json({ success: false, error: 'Failed to fetch categories' }, { status: 500 })
+    return NextResponse.json({ success: true, categories: [] })
   } finally {
-    client.release()
+    client?.release()
   }
 }

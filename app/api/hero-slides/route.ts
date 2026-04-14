@@ -3,9 +3,10 @@ import { getClient } from '@/lib/db'
 import { sanitizeImageUrl } from '@/lib/image-url'
 
 export async function GET() {
-  const client = await getClient()
+  let client: Awaited<ReturnType<typeof getClient>> | null = null
 
   try {
+    client = await getClient()
     await client.query('ALTER TABLE hero_slides ADD COLUMN IF NOT EXISTS trailer_link TEXT')
     await client.query('ALTER TABLE hero_slides ADD COLUMN IF NOT EXISTS download_link TEXT')
     await client.query('ALTER TABLE hero_slides ADD COLUMN IF NOT EXISTS price NUMERIC(10,2)')
@@ -57,8 +58,8 @@ export async function GET() {
     return NextResponse.json({ success: true, slides })
   } catch (error) {
     console.error('Public hero slides error:', error)
-    return NextResponse.json({ error: 'Failed to fetch hero slides' }, { status: 500 })
+    return NextResponse.json({ success: true, slides: [] })
   } finally {
-    client.release()
+    client?.release()
   }
 }

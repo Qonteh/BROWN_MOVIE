@@ -4,9 +4,10 @@ import { ensureMovieMediaSchema } from '@/lib/movie-media'
 import { sanitizeImageUrl } from '@/lib/image-url'
 
 export async function GET() {
-  const client = await getClient()
+  let client: Awaited<ReturnType<typeof getClient>> | null = null
 
   try {
+    client = await getClient()
     await ensureMovieMediaSchema(client)
 
     const result = await client.query(
@@ -83,8 +84,8 @@ export async function GET() {
     return NextResponse.json({ success: true, movies })
   } catch (error) {
     console.error('Public movies error:', error)
-    return NextResponse.json({ success: false, error: 'Failed to fetch movies' }, { status: 500 })
+    return NextResponse.json({ success: true, movies: [] })
   } finally {
-    client.release()
+    client?.release()
   }
 }

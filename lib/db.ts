@@ -1,25 +1,36 @@
 import { Pool, QueryResult } from 'pg';
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is not set');
+let pool: Pool | null = null
+
+function getPool() {
+  if (pool) {
+    return pool
+  }
+
+  const connectionString = process.env.DATABASE_URL
+  if (!connectionString) {
+    throw new Error('DATABASE_URL is not set')
+  }
+
+  pool = new Pool({
+    connectionString,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+  })
+
+  pool.on('error', (err) => {
+    console.error('Unexpected error on idle client', err)
+  })
+
+  return pool
 }
 
-// Create a connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 20, // maximum number of clients in the pool
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
-
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-});
-
 export async function query(text: string, params?: any[]): Promise<QueryResult> {
+  const activePool = getPool()
   const start = Date.now();
   try {
-    const result = await pool.query(text, params);
+    const result = await activePool.query(text, params);
     const duration = Date.now() - start;
     console.log('Executed query', { text, duration, rows: result.rowCount });
     return result;
@@ -30,7 +41,7 @@ export async function query(text: string, params?: any[]): Promise<QueryResult> 
 }
 
 export async function getClient() {
-  return pool.connect();
+  return getPool().connect();
 }
 
-export default pool;
+export default getPool;
