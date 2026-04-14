@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import Image from "next/image"
 import { ChevronLeft, ChevronRight, Play, Download } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -60,6 +59,7 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
   const [heroDownloadEta, setHeroDownloadEta] = useState<number | null>(null)
   const [heroDownloadToastId, setHeroDownloadToastId] = useState<string | number | null>(null)
   const [slides, setSlides] = useState<HeroSlide[]>([])
+  const [failedSlideIds, setFailedSlideIds] = useState<string[]>([])
   const touchStartXRef = useRef<number | null>(null)
   const touchEndXRef = useRef<number | null>(null)
 
@@ -107,9 +107,16 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
     loadSlides()
   }, [])
 
-  const activeSlides: HeroSlide[] = slides
+  const activeSlides: HeroSlide[] = slides.filter((slide) => !failedSlideIds.includes(slide.id))
 
   if (activeSlides.length === 0) {
+    return null
+  }
+
+  const safeCurrentIndex = currentIndex >= activeSlides.length ? 0 : currentIndex
+  const currentSlide = activeSlides[safeCurrentIndex]
+
+  if (!currentSlide) {
     return null
   }
 
@@ -128,15 +135,20 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
   }
 
   useEffect(() => {
+    if (currentIndex >= activeSlides.length) {
+      setCurrentIndex(0)
+    }
+  }, [activeSlides.length, currentIndex])
+
+  useEffect(() => {
     if (activeSlides.length <= 1) return
     const timer = setTimeout(() => {
       setCurrentIndex((prev) => (prev + 1) % activeSlides.length)
-    }, 6000)
+    }, 10000)
 
     return () => clearTimeout(timer)
-  }, [currentIndex, activeSlides.length])
+  }, [safeCurrentIndex, activeSlides.length])
 
-  const currentSlide = activeSlides[currentIndex]
   const currentMovie = currentSlide.movie
 
   const formatSpeed = (bytesPerSecond: number | null) => {
@@ -249,16 +261,18 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
       onTouchEnd={handleTouchEnd}
     >
       {/* Active background image only to avoid loading all hero images at once */}
-      <div
-        key={currentSlide.id}
-        className="absolute inset-0 pointer-events-none transition-all duration-700 opacity-100 scale-100"
-      >
-        <Image
+      <div className="absolute inset-0 pointer-events-none transition-all duration-700 opacity-100 scale-100">
+        <img
           src={currentSlide.image}
           alt={currentSlide.title}
-          fill
-          className="object-cover"
-          priority
+          className="h-full w-full object-cover"
+          loading="eager"
+          decoding="async"
+          onError={() => {
+            setFailedSlideIds((prev) =>
+              prev.includes(currentSlide.id) ? prev : [...prev, currentSlide.id],
+            )
+          }}
         />
       </div>
       
@@ -361,14 +375,14 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
             key={index}
             onClick={() => setCurrentIndex(index)}
             className="group relative h-1.5 rounded-full overflow-hidden transition-all"
-            style={{ width: index === currentIndex ? '48px' : '24px' }}
+            style={{ width: index === safeCurrentIndex ? '48px' : '24px' }}
             aria-label={`Go to slide ${index + 1}`}
             type="button"
           >
             <div className="absolute inset-0 bg-foreground/30" />
             <div 
-              className={`absolute inset-0 bg-orange transition-transform duration-[6000ms] origin-left ${
-                index === currentIndex ? "scale-x-100" : "scale-x-0"
+              className={`absolute inset-0 bg-orange transition-transform duration-[10000ms] origin-left ${
+                index === safeCurrentIndex ? "scale-x-100" : "scale-x-0"
               }`}
               style={{ transitionTimingFunction: 'linear' }}
             />
