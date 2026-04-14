@@ -140,14 +140,7 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
     }
   }, [activeSlides.length, currentIndex])
 
-  useEffect(() => {
-    if (activeSlides.length <= 1) return
-    const timer = setTimeout(() => {
-      setCurrentIndex((prev) => (prev + 1) % activeSlides.length)
-    }, 10000)
-
-    return () => clearTimeout(timer)
-  }, [safeCurrentIndex, activeSlides.length])
+  // Keep hero static by default to avoid repeated heavy image decoding on low-memory devices.
 
   const currentMovie = currentSlide.movie
 
@@ -381,7 +374,7 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
           >
             <div className="absolute inset-0 bg-foreground/30" />
             <div 
-              className={`absolute inset-0 bg-orange transition-transform duration-[10000ms] origin-left ${
+              className={`absolute inset-0 bg-orange transition-transform duration-300 origin-left ${
                 index === safeCurrentIndex ? "scale-x-100" : "scale-x-0"
               }`}
               style={{ transitionTimingFunction: 'linear' }}
