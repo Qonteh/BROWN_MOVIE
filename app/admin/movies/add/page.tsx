@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, X, Film, Save, ImageIcon, Link as LinkIcon, Upload, Loader2, Plus, Trash2 } from "lucide-react"
@@ -9,29 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 
-const movieCategories = [
-  { value: "action-kusisimua", label: "Movies za Action/Kusisimua" },
-  { value: "kivita", label: "Movies za Kivita" },
-  { value: "kutisha-horror", label: "Movies za Kutisha/Horror" },
-  { value: "sayansi-sci-fi", label: "Movies za Sayansi/SCI-FI" },
-  { value: "kuchekesha-comedy", label: "Movies za Kuchekesha/Comedy" },
-  { value: "mapenzi-drama", label: "Movies za Mapenzi/Drama" },
-  { value: "katuni-animation", label: "Movies za Katuni/Animation" },
-  { value: "wahindi", label: "Movies za Kihindi" },
-  { value: "kitambo-zilizotamba", label: "Movies za Kitambo/Zilizotamba" },
-  { value: "afrika", label: "Movies za Afrika" },
-]
-
-const seasonCategories = [
-  { value: "kichina", label: "Season za Kichina" },
-  { value: "wachina-japan", label: "Season za Wachina/Japan" },
-  { value: "indian-series", label: "Season za Kihindi" },
-  { value: "kizungu", label: "Season za Kizungu" },
-  { value: "korea", label: "Season za Korea" },
-  { value: "kifilipino", label: "Season za Kifilipino" },
-  { value: "kituruki", label: "Season za Kituruki" },
-  { value: "thailand", label: "Season za Thailand" },
-]
+type CategoryOption = {
+  id: string
+  name: string
+  slug: string
+  parent_slug: string | null
+}
 
 const qualities = [
   { value: "HD", label: "HD (720p)" },
@@ -59,6 +42,8 @@ export default function AddMoviePage() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState("")
+  const [categories, setCategories] = useState<CategoryOption[]>([])
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true)
   const [contentType, setContentType] = useState<"movie" | "series">("movie")
   const [posterInputMode, setPosterInputMode] = useState<"link" | "upload">("link")
   const [backdropInputMode, setBackdropInputMode] = useState<"link" | "upload">("link")
@@ -95,6 +80,47 @@ export default function AddMoviePage() {
   const handleChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      setIsLoadingCategories(true)
+      try {
+        const response = await fetch("/api/admin/categories", { cache: "no-store" })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok || !data.success || !Array.isArray(data.categories)) {
+          setCategories([])
+          return
+        }
+
+        setCategories(
+          data.categories
+            .filter((category: { id?: string; name?: string; slug?: string }) => category.id && category.name && category.slug)
+            .map((category: CategoryOption) => ({
+              id: category.id,
+              name: category.name,
+              slug: category.slug,
+              parent_slug: category.parent_slug,
+            })),
+        )
+      } catch {
+        setCategories([])
+      } finally {
+        setIsLoadingCategories(false)
+      }
+    }
+
+    loadCategories()
+  }, [])
+
+  const movieCategoryOptions = useMemo(
+    () => categories.filter((category) => category.parent_slug === null && category.slug !== "season"),
+    [categories],
+  )
+
+  const seasonCategoryOptions = useMemo(
+    () => categories.filter((category) => category.parent_slug === "season"),
+    [categories],
+  )
 
   const uploadMovieImage = async (file: File, target: "poster" | "backdrop") => {
     const setLoading = target === "poster" ? setIsUploadingPoster : setIsUploadingBackdrop
@@ -431,12 +457,15 @@ export default function AddMoviePage() {
                   <select
                     value={formData.seasonCategory}
                     onChange={(e) => handleChange("seasonCategory", e.target.value)}
+                    disabled={isLoadingCategories || seasonCategoryOptions.length === 0}
                     className="w-full rounded-lg border-0 bg-secondary px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   >
-                    <option value="">Select season category</option>
-                    {seasonCategories.map((cat) => (
-                      <option key={cat.value} value={cat.value}>
-                        {cat.label}
+                    <option value="">
+                      {isLoadingCategories ? "Loading season categories..." : "Select season category"}
+                    </option>
+                    {seasonCategoryOptions.map((cat) => (
+                      <option key={cat.id} value={cat.slug}>
+                        {cat.name}
                       </option>
                     ))}
                   </select>
@@ -444,15 +473,24 @@ export default function AddMoviePage() {
                   <select
                     value={formData.category}
                     onChange={(e) => handleChange("category", e.target.value)}
+                    disabled={isLoadingCategories || movieCategoryOptions.length === 0}
                     className="w-full rounded-lg border-0 bg-secondary px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                   >
-                    <option value="">Select movie category</option>
-                    {movieCategories.map((cat) => (
-                      <option key={cat.value} value={cat.value}>
-                        {cat.label}
+                    <option value="">
+                      {isLoadingCategories ? "Loading movie categories..." : "Select movie category"}
+                    </option>
+                    {movieCategoryOptions.map((cat) => (
+                      <option key={cat.id} value={cat.slug}>
+                        {cat.name}
                       </option>
                     ))}
                   </select>
+                )}
+                {!isLoadingCategories && contentType === "movie" && movieCategoryOptions.length === 0 && (
+                  <p className="text-xs text-amber-500">No movie categories found. Add categories first in Admin Categories.</p>
+                )}
+                {!isLoadingCategories && contentType === "series" && seasonCategoryOptions.length === 0 && (
+                  <p className="text-xs text-amber-500">No season categories found. Add season categories first in Admin Categories.</p>
                 )}
               </div>
 

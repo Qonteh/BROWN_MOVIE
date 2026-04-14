@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import { Grid3X3, ChevronRight } from "lucide-react"
-import { categories, seasonCategories } from "@/lib/movies-data"
 
 interface CategoryGridProps {
   onCategoryClick?: (categorySlug: string) => void
@@ -22,7 +21,7 @@ type ApiCategory = {
 }
 
 export function CategoryGrid({ onCategoryClick, onAllClick, activeCategorySlug = "all", showSeasons = false }: CategoryGridProps) {
-  const [apiCategories, setApiCategories] = useState<ApiCategory[] | null>(null)
+  const [apiCategories, setApiCategories] = useState<ApiCategory[]>([])
 
   useEffect(() => {
     let mounted = true
@@ -32,6 +31,9 @@ export function CategoryGrid({ onCategoryClick, onAllClick, activeCategorySlug =
         const response = await fetch("/api/categories", { cache: "no-store" })
         const data = await response.json().catch(() => ({}))
         if (!response.ok || !data.success || !Array.isArray(data.categories)) {
+          if (mounted) {
+            setApiCategories([])
+          }
           return
         }
 
@@ -39,7 +41,9 @@ export function CategoryGrid({ onCategoryClick, onAllClick, activeCategorySlug =
           setApiCategories(data.categories)
         }
       } catch {
-        // Keep static fallback categories.
+        if (mounted) {
+          setApiCategories([])
+        }
       }
     }
 
@@ -50,29 +54,22 @@ export function CategoryGrid({ onCategoryClick, onAllClick, activeCategorySlug =
   }, [])
 
   const displayCategories = useMemo(() => {
-    const fallback = showSeasons ? seasonCategories : categories
-    if (!apiCategories) return fallback
-
     const filtered = apiCategories
       .filter((category) => (showSeasons ? category.parent_slug === "season" : category.parent_slug === null && category.slug !== "season"))
       .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
-    if (filtered.length === 0) return fallback
-
-    return filtered.map((category, index) => {
-      const fallbackCategory = fallback[index % fallback.length]
-      return {
-        id: category.id,
-        name: category.name,
-        slug: category.slug,
-        image:
-          category.image_url ||
-          fallbackCategory?.image ||
-          "https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?w=900&h=560&fit=crop",
-        color: fallbackCategory?.color || "from-orange-500 to-amber-700",
-      }
-    })
+    return filtered.map((category) => ({
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      image: category.image_url || "https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?w=900&h=560&fit=crop",
+      color: "from-orange-500 to-amber-700",
+    }))
   }, [apiCategories, showSeasons])
+
+  if (displayCategories.length === 0) {
+    return null
+  }
 
   return (
     <section className="container mx-auto px-4 py-8 md:py-12">

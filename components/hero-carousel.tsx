@@ -5,7 +5,7 @@ import Image from "next/image"
 import { ChevronLeft, ChevronRight, Play, Download } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { featuredMovies, formatPrice, type Movie } from "@/lib/movies-data"
+import { formatPrice, type Movie } from "@/lib/movies-data"
 import { downloadFileWithProgress } from "@/lib/download-client"
 import { getAuthToken } from "@/lib/auth"
 
@@ -100,28 +100,18 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
           setCurrentIndex(0)
         }
       } catch {
-        // Fallback to local featuredMovies when API is unavailable.
+        setSlides([])
       }
     }
 
     loadSlides()
   }, [])
 
-  const activeSlides: HeroSlide[] =
-    slides.length > 0
-      ? slides
-      : featuredMovies.map((movie) => ({
-          id: movie.id,
-          image: movie.image,
-          title: movie.title,
-          subtitle: DEFAULT_HERO_SUBTITLE,
-          ctaText: "Nunua",
-          ctaLink: null,
-          trailerLink: null,
-          downloadLink: null,
-          hasDownloadSource: Boolean(movie.downloadUrl),
-          movie,
-        }))
+  const activeSlides: HeroSlide[] = slides
+
+  if (activeSlides.length === 0) {
+    return null
+  }
 
   const nextSlide = useCallback(() => {
     if (isAnimating) return
