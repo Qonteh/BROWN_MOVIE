@@ -4,7 +4,12 @@ let pool: Pool | null = null
 
 function normalizeDatabaseUrl(raw: string) {
   // Guard against common typo: channel_binding=requvire
-  return raw.replace(/channel_binding=requvire/gi, 'channel_binding=require')
+  let normalized = raw.replace(/channel_binding=requvire/gi, 'channel_binding=require')
+
+  // pg currently treats these modes as verify-full; make it explicit to avoid warnings.
+  normalized = normalized.replace(/sslmode=(prefer|require|verify-ca)/gi, 'sslmode=verify-full')
+
+  return normalized
 }
 
 function getPool() {
