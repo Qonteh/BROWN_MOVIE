@@ -12,9 +12,6 @@ interface HeroCarouselProps {
   onMovieClick?: (movie: Movie) => void
 }
 
-const DEFAULT_HERO_SUBTITLE =
-  "Furaha ya sinema inakuja kwenye kiganja chako. Download sasa na ufurahie movie hii ya kipekee."
-
 type HeroSlideApiRow = {
   id: string
   title: string
@@ -50,21 +47,19 @@ type HeroSlide = {
 }
 
 const HERO_SLIDES_CACHE_KEY = "brown:hero-slides"
-const HERO_FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1600&h=900&fit=crop"
 
 let cachedHeroSlides: HeroSlide[] | null = null
 let heroSlidesRequest: Promise<HeroSlide[]> | null = null
 
 function mapHeroRows(rows: HeroSlideApiRow[]): HeroSlide[] {
   return rows
-    .filter((row) => row.title)
+    .filter((row) => Boolean(row.title?.trim() && row.image_url?.trim()))
     .map((row) => ({
       id: row.id,
-      image: row.image_url || HERO_FALLBACK_IMAGE,
+      image: row.image_url,
       title: row.title,
-      subtitle: row.subtitle?.trim() || DEFAULT_HERO_SUBTITLE,
-      ctaText: row.cta_text || "Nunua",
+      subtitle: row.subtitle?.trim() || "",
+      ctaText: row.cta_text?.trim() || "",
       ctaLink: row.cta_link,
       trailerLink: row.trailer_link,
       downloadLink: row.download_link,
@@ -73,10 +68,10 @@ function mapHeroRows(rows: HeroSlideApiRow[]): HeroSlide[] {
         id: row.movie_id || row.id,
         title: row.movie_title || row.title,
         price: Number(row.hero_price ?? row.movie_price ?? 0),
-        image: row.movie_image || row.image_url || HERO_FALLBACK_IMAGE,
-        category: row.movie_category || "hero",
+        image: row.movie_image || row.image_url,
+        category: row.movie_category || "",
         year: row.movie_year || undefined,
-        quality: row.movie_quality || "HD",
+        quality: row.movie_quality || undefined,
       },
     }))
 }
@@ -127,6 +122,7 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
   const [heroDownloadEta, setHeroDownloadEta] = useState<number | null>(null)
   const [heroDownloadToastId, setHeroDownloadToastId] = useState<string | number | null>(null)
   const [slides, setSlides] = useState<HeroSlide[]>([])
+  const [failedSlideIds, setFailedSlideIds] = useState<string[]>([])
   const touchStartXRef = useRef<number | null>(null)
   const touchEndXRef = useRef<number | null>(null)
 
@@ -164,7 +160,7 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
     loadSlides()
   }, [])
 
-  const activeSlides = slides
+  const activeSlides = slides.filter((slide) => !failedSlideIds.includes(slide.id))
   const safeCurrentIndex = activeSlides.length > 0 && currentIndex < activeSlides.length ? currentIndex : 0
   const currentSlide = activeSlides[safeCurrentIndex] ?? null
 
@@ -210,13 +206,7 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
   }
 
   const handleSlideImageError = () => {
-    setSlides((prev) =>
-      prev.map((slide) =>
-        slide.id === currentSlide.id
-          ? { ...slide, image: HERO_FALLBACK_IMAGE }
-          : slide,
-      ),
-    )
+    setFailedSlideIds((prev) => (prev.includes(currentSlide.id) ? prev : [...prev, currentSlide.id]))
   }
 
   const currentMovie = currentSlide.movie
@@ -352,12 +342,16 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
         <div className="container mx-auto">
           {/* Quality Badge */}
           <div className="flex items-center gap-3 mb-4">
-            <span className="px-3 py-1 bg-orange text-primary-foreground text-xs font-bold rounded-full">
-              {currentMovie.quality || "HD"}
-            </span>
-            <span className="px-3 py-1 bg-secondary/80 backdrop-blur text-foreground text-xs font-medium rounded-full">
-              {currentMovie.year || "New"}
-            </span>
+            {currentMovie.quality ? (
+              <span className="px-3 py-1 bg-orange text-primary-foreground text-xs font-bold rounded-full">
+                {currentMovie.quality}
+              </span>
+            ) : null}
+            {currentMovie.year ? (
+              <span className="px-3 py-1 bg-secondary/80 backdrop-blur text-foreground text-xs font-medium rounded-full">
+                {currentMovie.year}
+              </span>
+            ) : null}
           </div>
 
           {/* Title */}
@@ -387,7 +381,7 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
                   ? heroDownloadProgress !== null
                     ? `Downloading ${heroDownloadProgress}%`
                     : `Downloading ${formatDownloadedMb(heroDownloadedBytes)}`
-                  : currentSlide.ctaText || "Download"}
+                  : currentSlide.ctaText}
                 {currentMovie.price > 0 ? ` - ${formatPrice(currentMovie.price)}` : ""}
               </span>
             </Button>

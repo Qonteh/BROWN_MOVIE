@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     const movieId = toNullableString(body.movieId)
     const subtitle = toNullableString(body.subtitle)
     const description = toNullableString(body.description)
-    const ctaText = toNullableString(body.ctaText) ?? 'Download'
+    const ctaText = toNullableString(body.ctaText)
     const ctaLink = toNullableString(body.ctaLink)
     const trailerLink = toNullableString(body.trailerLink)
     const downloadLink = toNullableString(body.downloadLink)
