@@ -2,14 +2,29 @@ import { NextResponse } from 'next/server'
 import { getClient } from '@/lib/db'
 import { sanitizeImageUrl } from '@/lib/image-url'
 
+let ensureHeroColumnsPromise: Promise<void> | null = null
+
+async function ensureHeroSchema(client: Awaited<ReturnType<typeof getClient>>) {
+  if (!ensureHeroColumnsPromise) {
+    ensureHeroColumnsPromise = (async () => {
+      await client.query('ALTER TABLE hero_slides ADD COLUMN IF NOT EXISTS trailer_link TEXT')
+      await client.query('ALTER TABLE hero_slides ADD COLUMN IF NOT EXISTS download_link TEXT')
+      await client.query('ALTER TABLE hero_slides ADD COLUMN IF NOT EXISTS price NUMERIC(10,2)')
+    })().catch((error) => {
+      ensureHeroColumnsPromise = null
+      throw error
+    })
+  }
+
+  await ensureHeroColumnsPromise
+}
+
 export async function GET() {
   let client: Awaited<ReturnType<typeof getClient>> | null = null
 
   try {
     client = await getClient()
-    await client.query('ALTER TABLE hero_slides ADD COLUMN IF NOT EXISTS trailer_link TEXT')
-    await client.query('ALTER TABLE hero_slides ADD COLUMN IF NOT EXISTS download_link TEXT')
-    await client.query('ALTER TABLE hero_slides ADD COLUMN IF NOT EXISTS price NUMERIC(10,2)')
+    await ensureHeroSchema(client)
 
     const result = await client.query(
       `SELECT
@@ -55,10 +70,24 @@ export async function GET() {
       })
       .filter((row: { image_url: string | null }) => row.image_url)
 
-    return NextResponse.json({ success: true, slides })
+    return NextResponse.json(
+      { success: true, slides },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600',
+        },
+      },
+    )
   } catch (error) {
     console.error('Public hero slides error:', error)
-    return NextResponse.json({ success: true, slides: [] })
+    return NextResponse.json(
+      { success: true, slides: [] },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120',
+        },
+      },
+    )
   } finally {
     client?.release()
   }

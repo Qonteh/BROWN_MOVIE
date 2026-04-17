@@ -20,30 +20,79 @@ type ApiCategory = {
   sort_order: number
 }
 
+const CATEGORIES_CACHE_KEY = "brown:public-categories"
+
+let cachedCategories: ApiCategory[] | null = null
+let categoriesRequest: Promise<ApiCategory[]> | null = null
+
+async function fetchSharedCategories() {
+  if (cachedCategories) {
+    return cachedCategories
+  }
+
+  if (categoriesRequest) {
+    return categoriesRequest
+  }
+
+  categoriesRequest = (async () => {
+    const response = await fetch("/api/categories")
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok || !data.success || !Array.isArray(data.categories)) {
+      throw new Error("Failed to load categories")
+    }
+
+    cachedCategories = data.categories as ApiCategory[]
+
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(cachedCategories))
+      }
+    } catch {
+      // Ignore storage limitations and keep runtime cache only.
+    }
+
+    return cachedCategories
+  })()
+
+  try {
+    return await categoriesRequest
+  } finally {
+    categoriesRequest = null
+  }
+}
+
 export function CategoryGrid({ onCategoryClick, onAllClick, activeCategorySlug = "all", showSeasons = false }: CategoryGridProps) {
   const [apiCategories, setApiCategories] = useState<ApiCategory[]>([])
 
   useEffect(() => {
     let mounted = true
 
-    const loadCategories = async () => {
+    if (cachedCategories && mounted) {
+      setApiCategories(cachedCategories)
+    } else {
       try {
-        const response = await fetch("/api/categories", { cache: "no-store" })
-        const data = await response.json().catch(() => ({}))
-        if (!response.ok || !data.success || !Array.isArray(data.categories)) {
-          if (mounted) {
-            setApiCategories([])
+        const stored = window.sessionStorage.getItem(CATEGORIES_CACHE_KEY)
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            cachedCategories = parsed as ApiCategory[]
+            setApiCategories(cachedCategories)
           }
-          return
-        }
-
-        if (mounted) {
-          setApiCategories(data.categories)
         }
       } catch {
-        if (mounted) {
-          setApiCategories([])
+        // Ignore invalid storage payload.
+      }
+    }
+
+    const loadCategories = async () => {
+      try {
+        const categories = await fetchSharedCategories()
+        if (mounted && categories.length > 0) {
+          setApiCategories(categories)
         }
+      } catch {
+        // Keep last good categories to avoid UI flicker on transient failures.
       }
     }
 

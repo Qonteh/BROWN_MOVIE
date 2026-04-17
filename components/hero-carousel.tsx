@@ -49,6 +49,74 @@ type HeroSlide = {
   movie: Movie
 }
 
+const HERO_SLIDES_CACHE_KEY = "brown:hero-slides"
+const HERO_FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1600&h=900&fit=crop"
+
+let cachedHeroSlides: HeroSlide[] | null = null
+let heroSlidesRequest: Promise<HeroSlide[]> | null = null
+
+function mapHeroRows(rows: HeroSlideApiRow[]): HeroSlide[] {
+  return rows
+    .filter((row) => row.title)
+    .map((row) => ({
+      id: row.id,
+      image: row.image_url || HERO_FALLBACK_IMAGE,
+      title: row.title,
+      subtitle: row.subtitle?.trim() || DEFAULT_HERO_SUBTITLE,
+      ctaText: row.cta_text || "Nunua",
+      ctaLink: row.cta_link,
+      trailerLink: row.trailer_link,
+      downloadLink: row.download_link,
+      hasDownloadSource: Boolean(row.download_link || row.movie_download_url),
+      movie: {
+        id: row.movie_id || row.id,
+        title: row.movie_title || row.title,
+        price: Number(row.hero_price ?? row.movie_price ?? 0),
+        image: row.movie_image || row.image_url || HERO_FALLBACK_IMAGE,
+        category: row.movie_category || "hero",
+        year: row.movie_year || undefined,
+        quality: row.movie_quality || "HD",
+      },
+    }))
+}
+
+async function fetchSharedHeroSlides() {
+  if (cachedHeroSlides) {
+    return cachedHeroSlides
+  }
+
+  if (heroSlidesRequest) {
+    return heroSlidesRequest
+  }
+
+  heroSlidesRequest = (async () => {
+    const response = await fetch("/api/hero-slides")
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok || !data.success || !Array.isArray(data.slides)) {
+      throw new Error("Failed to load hero slides")
+    }
+
+    cachedHeroSlides = mapHeroRows(data.slides as HeroSlideApiRow[])
+
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(HERO_SLIDES_CACHE_KEY, JSON.stringify(cachedHeroSlides))
+      }
+    } catch {
+      // Ignore storage limitations and keep runtime cache only.
+    }
+
+    return cachedHeroSlides
+  })()
+
+  try {
+    return await heroSlidesRequest
+  } finally {
+    heroSlidesRequest = null
+  }
+}
+
 export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
@@ -59,57 +127,45 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
   const [heroDownloadEta, setHeroDownloadEta] = useState<number | null>(null)
   const [heroDownloadToastId, setHeroDownloadToastId] = useState<string | number | null>(null)
   const [slides, setSlides] = useState<HeroSlide[]>([])
-  const [failedSlideIds, setFailedSlideIds] = useState<string[]>([])
   const touchStartXRef = useRef<number | null>(null)
   const touchEndXRef = useRef<number | null>(null)
 
   useEffect(() => {
+    if (cachedHeroSlides && cachedHeroSlides.length > 0) {
+      setSlides(cachedHeroSlides)
+    } else {
+      try {
+        const stored = window.sessionStorage.getItem(HERO_SLIDES_CACHE_KEY)
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            cachedHeroSlides = parsed as HeroSlide[]
+            setSlides(cachedHeroSlides)
+          }
+        }
+      } catch {
+        // Ignore invalid storage payload.
+      }
+    }
+
     const loadSlides = async () => {
       try {
-        const response = await fetch("/api/hero-slides", { cache: "no-store" })
-        const data = await response.json().catch(() => ({}))
-        if (!response.ok || !data.success || !Array.isArray(data.slides)) {
-          return
-        }
-
-        const mappedSlides = (data.slides as HeroSlideApiRow[])
-          .filter((row) => row.image_url && row.title)
-          .map((row) => ({
-            id: row.id,
-            image: row.image_url,
-            title: row.title,
-            subtitle: row.subtitle?.trim() || DEFAULT_HERO_SUBTITLE,
-            ctaText: row.cta_text || "Nunua",
-            ctaLink: row.cta_link,
-            trailerLink: row.trailer_link,
-            downloadLink: row.download_link,
-            hasDownloadSource: Boolean(row.download_link || row.movie_download_url),
-            movie: {
-              id: row.movie_id || row.id,
-              title: row.movie_title || row.title,
-              price: Number(row.hero_price ?? row.movie_price ?? 0),
-              image: row.movie_image || row.image_url,
-              category: row.movie_category || "hero",
-              year: row.movie_year || undefined,
-              quality: row.movie_quality || "HD",
-            },
-          }))
+        const mappedSlides = await fetchSharedHeroSlides()
 
         if (mappedSlides.length > 0) {
           setSlides(mappedSlides)
           setCurrentIndex(0)
         }
       } catch {
-        setSlides([])
+        // Keep current slides to prevent blank hero if request briefly fails.
       }
     }
 
     loadSlides()
   }, [])
 
-  const activeSlides: HeroSlide[] = slides.filter((slide) => !failedSlideIds.includes(slide.id))
-  const hasActiveSlides = activeSlides.length > 0
-  const safeCurrentIndex = hasActiveSlides && currentIndex < activeSlides.length ? currentIndex : 0
+  const activeSlides = slides
+  const safeCurrentIndex = activeSlides.length > 0 && currentIndex < activeSlides.length ? currentIndex : 0
   const currentSlide = activeSlides[safeCurrentIndex] ?? null
 
   const nextSlide = useCallback(() => {
@@ -139,10 +195,28 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
     }
   }, [activeSlides.length, currentIndex])
 
-  // Keep hero static by default to avoid repeated heavy image decoding on low-memory devices.
+  useEffect(() => {
+    if (activeSlides.length <= 1) return
+
+    const timer = window.setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % activeSlides.length)
+    }, 5000)
+
+    return () => window.clearInterval(timer)
+  }, [activeSlides.length])
 
   if (!currentSlide) {
     return null
+  }
+
+  const handleSlideImageError = () => {
+    setSlides((prev) =>
+      prev.map((slide) =>
+        slide.id === currentSlide.id
+          ? { ...slide, image: HERO_FALLBACK_IMAGE }
+          : slide,
+      ),
+    )
   }
 
   const currentMovie = currentSlide.movie
@@ -264,11 +338,7 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
           className="h-full w-full object-cover"
           loading="eager"
           decoding="async"
-          onError={() => {
-            setFailedSlideIds((prev) =>
-              prev.includes(currentSlide.id) ? prev : [...prev, currentSlide.id],
-            )
-          }}
+          onError={handleSlideImageError}
         />
       </div>
       

@@ -1,8 +1,21 @@
 import { NextResponse } from 'next/server'
 import { getClient } from '@/lib/db'
 
+let ensureCategoryImageColumnPromise: Promise<void> | null = null
+
 async function ensureCategoryImageColumn(client: Awaited<ReturnType<typeof getClient>>) {
   await client.query('ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url TEXT')
+}
+
+async function ensureCategorySchema(client: Awaited<ReturnType<typeof getClient>>) {
+  if (!ensureCategoryImageColumnPromise) {
+    ensureCategoryImageColumnPromise = ensureCategoryImageColumn(client).catch((error) => {
+      ensureCategoryImageColumnPromise = null
+      throw error
+    })
+  }
+
+  await ensureCategoryImageColumnPromise
 }
 
 export async function GET() {
@@ -10,7 +23,7 @@ export async function GET() {
 
   try {
     client = await getClient()
-    await ensureCategoryImageColumn(client)
+    await ensureCategorySchema(client)
 
     const result = await client.query(
       `SELECT
@@ -32,10 +45,24 @@ export async function GET() {
        ORDER BY c.parent_id NULLS FIRST, c.sort_order ASC, c.name ASC`,
     )
 
-    return NextResponse.json({ success: true, categories: result.rows })
+    return NextResponse.json(
+      { success: true, categories: result.rows },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=120, stale-while-revalidate=600',
+        },
+      },
+    )
   } catch (error) {
     console.error('Public categories error:', error)
-    return NextResponse.json({ success: true, categories: [] })
+    return NextResponse.json(
+      { success: true, categories: [] },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120',
+        },
+      },
+    )
   } finally {
     client?.release()
   }

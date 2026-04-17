@@ -341,7 +341,7 @@ export default function HomePage() {
     moviesContent = (
       <div className="container mx-auto px-4 py-10">
         <div className="rounded-3xl border border-border bg-card p-8 text-center text-muted-foreground shadow-lg">
-          Loading movies from database...
+          Loading movies...
         </div>
       </div>
     )
@@ -393,7 +393,7 @@ export default function HomePage() {
     moviesContent = (
       <div className="container mx-auto px-4 py-10">
         <div className="rounded-3xl border border-destructive/30 bg-destructive/10 p-8 text-center text-sm text-destructive shadow-lg">
-          {movieError}
+          Unable to load movies right now. Please try again in a moment.
         </div>
       </div>
     )
