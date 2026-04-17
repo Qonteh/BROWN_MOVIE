@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { HeroCarousel } from "@/components/hero-carousel"
-import { SearchBar } from "@/components/search-bar"
 import { CategoryGrid } from "@/components/category-grid"
 import { MovieCarousel } from "@/components/movie-carousel"
 import { MovieCard } from "@/components/movie-card"
@@ -454,20 +453,6 @@ export default function HomePage() {
       <main className="pt-16 lg:pt-20">
         {/* Hero Carousel */}
         <HeroCarousel onMovieClick={handleMovieClick} />
-
-        {/* Search Bar */}
-        <SearchBar 
-          activeFilter={activeFilter}
-          onFilterChange={(value) => {
-            setViewAllSectionTitle(null)
-            setActiveFilter(value)
-            if (value !== "all") {
-              setSelectedCategorySlug("all")
-            }
-          }}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-        />
 
         {/* Main Categories */}
         <CategoryGrid

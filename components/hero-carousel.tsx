@@ -326,7 +326,7 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
 
   return (
     <div
-      className="relative w-full h-[60vh] md:h-[70vh] lg:h-[85vh] overflow-hidden touch-pan-y"
+      className="relative w-full h-[45vh] md:h-[70vh] lg:h-[85vh] overflow-hidden touch-pan-y"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
