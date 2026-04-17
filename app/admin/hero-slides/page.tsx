@@ -214,6 +214,12 @@ export default function HeroSlidesPage() {
         throw new Error(data.error || "Failed to create hero slide")
       }
 
+      // Clear hero slides cache so homepage picks up new slide
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem("brown:hero-slides")
+        window.dispatchEvent(new CustomEvent("hero-slides-changed"))
+      }
+
       setIsCreateOpen(false)
       resetForm()
       await loadSlides()
@@ -268,6 +274,12 @@ export default function HeroSlidesPage() {
         throw new Error(data.error || "Failed to update hero slide")
       }
 
+      // Clear hero slides cache so homepage picks up updated slide
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem("brown:hero-slides")
+        window.dispatchEvent(new CustomEvent("hero-slides-changed"))
+      }
+
       setIsEditOpen(false)
       resetForm()
       await loadSlides()
@@ -283,6 +295,12 @@ export default function HeroSlidesPage() {
     try {
       setError("")
       const response = await fetch(`/api/admin/hero-slides/${slide.id}`, { method: "DELETE" })
+      // Clear hero slides cache so homepage picks up deletion
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem("brown:hero-slides")
+        window.dispatchEvent(new CustomEvent("hero-slides-changed"))
+      }
+
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok || !data.success) {

@@ -189,6 +189,12 @@ export default function CategoriesPage() {
         throw new Error(data.error || "Failed to create category")
       }
 
+      // Clear categories cache so homepage picks up new category
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem("brown:public-categories")
+        window.dispatchEvent(new CustomEvent("categories-changed"))
+      }
+
       resetCreateForm()
       setIsAddingCategory(false)
       await loadCategories({ background: true })
@@ -233,6 +239,12 @@ export default function CategoriesPage() {
         throw new Error(data.error || "Failed to update category")
       }
 
+      // Clear categories cache so homepage picks up updated category
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem("brown:public-categories")
+        window.dispatchEvent(new CustomEvent("categories-changed"))
+      }
+
       setIsEditingCategory(false)
       setEditingCategoryId(null)
       await loadCategories({ background: true })
@@ -254,6 +266,12 @@ export default function CategoriesPage() {
       const data = await response.json().catch(() => ({}))
       if (!response.ok || !data.success) {
         throw new Error(data.error || "Failed to delete category")
+      }
+
+      // Clear categories cache so homepage picks up deletion
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem("brown:public-categories")
+        window.dispatchEvent(new CustomEvent("categories-changed"))
       }
 
       await loadCategories({ background: true })

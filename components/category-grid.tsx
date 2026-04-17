@@ -66,6 +66,16 @@ export function CategoryGrid({ onCategoryClick, onAllClick, activeCategorySlug =
   const [apiCategories, setApiCategories] = useState<ApiCategory[]>([])
 
   useEffect(() => {
+    const handleCacheInvalidation = () => {
+      cachedCategories = null
+      categoriesRequest = null
+    }
+
+    window.addEventListener("categories-changed", handleCacheInvalidation)
+    return () => window.removeEventListener("categories-changed", handleCacheInvalidation)
+  }, [])
+
+  useEffect(() => {
     let mounted = true
 
     if (cachedCategories && mounted) {

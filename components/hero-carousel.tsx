@@ -126,6 +126,17 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
   const touchStartXRef = useRef<number | null>(null)
   const touchEndXRef = useRef<number | null>(null)
 
+  // Listen for cache invalidation events
+  useEffect(() => {
+    const handleCacheInvalidation = () => {
+      cachedHeroSlides = null
+      heroSlidesRequest = null
+    }
+
+    window.addEventListener("hero-slides-changed", handleCacheInvalidation)
+    return () => window.removeEventListener("hero-slides-changed", handleCacheInvalidation)
+  }, [])
+
   useEffect(() => {
     if (cachedHeroSlides && cachedHeroSlides.length > 0) {
       setSlides(cachedHeroSlides)
