@@ -108,19 +108,12 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
   }, [])
 
   const activeSlides: HeroSlide[] = slides.filter((slide) => !failedSlideIds.includes(slide.id))
-
-  if (activeSlides.length === 0) {
-    return null
-  }
-
-  const safeCurrentIndex = currentIndex >= activeSlides.length ? 0 : currentIndex
-  const currentSlide = activeSlides[safeCurrentIndex]
-
-  if (!currentSlide) {
-    return null
-  }
+  const hasActiveSlides = activeSlides.length > 0
+  const safeCurrentIndex = hasActiveSlides && currentIndex < activeSlides.length ? currentIndex : 0
+  const currentSlide = activeSlides[safeCurrentIndex] ?? null
 
   const nextSlide = useCallback(() => {
+    if (activeSlides.length === 0) return
     if (isAnimating) return
     setIsAnimating(true)
     setCurrentIndex((prev) => (prev + 1) % activeSlides.length)
@@ -128,6 +121,7 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
   }, [isAnimating, activeSlides.length])
 
   const prevSlide = () => {
+    if (activeSlides.length === 0) return
     if (isAnimating) return
     setIsAnimating(true)
     setCurrentIndex((prev) => (prev - 1 + activeSlides.length) % activeSlides.length)
@@ -135,12 +129,21 @@ export function HeroCarousel({ onMovieClick }: HeroCarouselProps) {
   }
 
   useEffect(() => {
+    if (activeSlides.length === 0) {
+      setCurrentIndex(0)
+      return
+    }
+
     if (currentIndex >= activeSlides.length) {
       setCurrentIndex(0)
     }
   }, [activeSlides.length, currentIndex])
 
   // Keep hero static by default to avoid repeated heavy image decoding on low-memory devices.
+
+  if (!currentSlide) {
+    return null
+  }
 
   const currentMovie = currentSlide.movie
 
