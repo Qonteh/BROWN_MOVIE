@@ -30,6 +30,8 @@ type CategoryRow = {
 
 type CategoryType = "main" | "season"
 
+const ADMIN_CATEGORIES_CACHE_KEY = "brown:admin-categories"
+
 const categoryColorClasses = [
   "from-orange-500 to-red-700",
   "from-gray-600 to-gray-900",
@@ -46,6 +48,7 @@ const categoryColorClasses = [
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<CategoryRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState("")
 
   const [isAddingCategory, setIsAddingCategory] = useState(false)
@@ -93,27 +96,54 @@ export default function CategoriesPage() {
     }
   }
 
-  const loadCategories = async () => {
-    setLoading(true)
+  const loadCategories = async ({ background = false }: { background?: boolean } = {}) => {
+    if (background) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+    }
     setError("")
 
     try {
-      const response = await fetch("/api/admin/categories", { cache: "no-store" })
+      const response = await fetch("/api/admin/categories")
       const data = await response.json().catch(() => ({}))
       if (!response.ok || !data.success) {
         throw new Error(data.error || "Failed to fetch categories")
       }
 
-      setCategories(Array.isArray(data.categories) ? data.categories : [])
+      const nextCategories = Array.isArray(data.categories) ? data.categories : []
+      setCategories(nextCategories)
+      try {
+        window.sessionStorage.setItem(ADMIN_CATEGORIES_CACHE_KEY, JSON.stringify(nextCategories))
+      } catch {
+        // Ignore storage failures and keep runtime state only.
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch categories")
     } finally {
-      setLoading(false)
+      if (background) {
+        setRefreshing(false)
+      } else {
+        setLoading(false)
+      }
     }
   }
 
   useEffect(() => {
-    loadCategories()
+    try {
+      const cached = window.sessionStorage.getItem(ADMIN_CATEGORIES_CACHE_KEY)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed)) {
+          setCategories(parsed as CategoryRow[])
+          setLoading(false)
+        }
+      }
+    } catch {
+      // Ignore invalid cache payloads.
+    }
+
+    loadCategories({ background: false })
   }, [])
 
   const mainCategories = useMemo(
@@ -161,7 +191,7 @@ export default function CategoriesPage() {
 
       resetCreateForm()
       setIsAddingCategory(false)
-      await loadCategories()
+      await loadCategories({ background: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create category")
     }
@@ -205,7 +235,7 @@ export default function CategoriesPage() {
 
       setIsEditingCategory(false)
       setEditingCategoryId(null)
-      await loadCategories()
+      await loadCategories({ background: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update category")
     }
@@ -226,7 +256,7 @@ export default function CategoriesPage() {
         throw new Error(data.error || "Failed to delete category")
       }
 
-      await loadCategories()
+      await loadCategories({ background: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete category")
     }
@@ -461,7 +491,13 @@ export default function CategoriesPage() {
 
       {loading && (
         <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
-          Loading categories from database...
+          Loading categories...
+        </div>
+      )}
+
+      {!loading && refreshing && (
+        <div className="rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground">
+          Refreshing categories...
         </div>
       )}
 

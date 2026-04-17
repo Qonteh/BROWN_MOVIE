@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getClient } from '@/lib/db'
 
+let ensureCategoryImageColumnPromise: Promise<void> | null = null
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -29,11 +31,22 @@ async function ensureCategoryImageColumn(client: Awaited<ReturnType<typeof getCl
   await client.query('ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url TEXT')
 }
 
+async function ensureCategorySchema(client: Awaited<ReturnType<typeof getClient>>) {
+  if (!ensureCategoryImageColumnPromise) {
+    ensureCategoryImageColumnPromise = ensureCategoryImageColumn(client).catch((error) => {
+      ensureCategoryImageColumnPromise = null
+      throw error
+    })
+  }
+
+  await ensureCategoryImageColumnPromise
+}
+
 export async function GET() {
   const client = await getClient()
 
   try {
-    await ensureCategoryImageColumn(client)
+    await ensureCategorySchema(client)
 
     const result = await client.query(
       `SELECT
@@ -69,7 +82,7 @@ export async function POST(request: NextRequest) {
   const client = await getClient()
 
   try {
-    await ensureCategoryImageColumn(client)
+    await ensureCategorySchema(client)
 
     const body = await request.json()
     const name = typeof body.name === 'string' ? body.name.trim() : ''
