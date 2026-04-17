@@ -37,6 +37,8 @@ type HeroSlide = {
 type MovieOption = {
   id: string
   title: string
+  release_year?: number | null
+  is_active?: boolean
 }
 
 type SlideFormState = {
@@ -98,20 +100,73 @@ export default function HeroSlidesPage() {
   const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [uploadStatus, setUploadStatus] = useState("")
 
+  const normalizeMovieOptions = (rows: unknown[]): MovieOption[] => {
+    if (!Array.isArray(rows)) return []
+
+    return rows
+      .map((row) => {
+        const candidate = row as Record<string, unknown>
+        const id = typeof candidate.id === "string" ? candidate.id : ""
+        const title = typeof candidate.title === "string" ? candidate.title.trim() : ""
+        const releaseYearRaw = candidate.release_year
+        const releaseYear =
+          typeof releaseYearRaw === "number"
+            ? releaseYearRaw
+            : typeof releaseYearRaw === "string"
+              ? Number.parseInt(releaseYearRaw, 10)
+              : null
+
+        return {
+          id,
+          title,
+          release_year: Number.isFinite(releaseYear as number) ? (releaseYear as number) : null,
+          is_active: typeof candidate.is_active === "boolean" ? candidate.is_active : undefined,
+        }
+      })
+      .filter((movie) => movie.id && movie.title)
+  }
+
+  const mergeMovieOptions = (primary: MovieOption[], fallback: MovieOption[]) => {
+    const byId = new Map<string, MovieOption>()
+
+    for (const movie of [...primary, ...fallback]) {
+      if (!byId.has(movie.id)) {
+        byId.set(movie.id, movie)
+      }
+    }
+
+    return Array.from(byId.values()).sort((a, b) => {
+      const activeA = a.is_active === false ? 0 : 1
+      const activeB = b.is_active === false ? 0 : 1
+      if (activeA !== activeB) return activeB - activeA
+      return a.title.localeCompare(b.title)
+    })
+  }
+
   const loadSlides = async () => {
     setLoading(true)
     setError("")
 
     try {
-      const response = await fetch("/api/admin/hero-slides", { cache: "no-store" })
-      const data = await response.json().catch(() => ({}))
+      const [heroResponse, moviesResponse] = await Promise.all([
+        fetch("/api/admin/hero-slides", { cache: "no-store" }),
+        fetch("/api/admin/movies", { cache: "no-store" }),
+      ])
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Failed to fetch hero slides")
+      const heroData = await heroResponse.json().catch(() => ({}))
+      const moviesData = await moviesResponse.json().catch(() => ({}))
+
+      if (!heroResponse.ok || !heroData.success) {
+        throw new Error(heroData.error || "Failed to fetch hero slides")
       }
 
-      setSlides(Array.isArray(data.slides) ? data.slides : [])
-      setMovies(Array.isArray(data.movies) ? data.movies : [])
+      setSlides(Array.isArray(heroData.slides) ? heroData.slides : [])
+
+      const heroMovies = normalizeMovieOptions(heroData.movies)
+      const fallbackMovies = moviesResponse.ok && moviesData.success
+        ? normalizeMovieOptions(moviesData.movies)
+        : []
+      setMovies(mergeMovieOptions(heroMovies, fallbackMovies))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch hero slides")
     } finally {
@@ -333,6 +388,8 @@ export default function HeroSlidesPage() {
           {movies.map((movie) => (
             <option key={movie.id} value={movie.id}>
               {movie.title}
+              {movie.release_year ? ` (${movie.release_year})` : ""}
+              {movie.is_active === false ? " [inactive]" : ""}
             </option>
           ))}
         </select>

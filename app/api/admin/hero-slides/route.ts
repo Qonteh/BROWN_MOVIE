@@ -47,9 +47,9 @@ export async function GET() {
         ORDER BY hs.sort_order ASC, hs.created_at DESC`,
       ),
       client.query(
-        `SELECT id, title
+        `SELECT id, title, release_year, is_active
          FROM movies
-         ORDER BY created_at DESC`,
+         ORDER BY is_active DESC, created_at DESC`,
       ),
     ])
 
